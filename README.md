@@ -8,6 +8,7 @@ Currently supported:
 - Wget
 - Pip
 - Docker
+- Podman
 - GnuPG
 - Rust
 - Corkscrew (SSH)
