@@ -12,6 +12,9 @@ Currently supported:
 - GnuPG
 - Rust
 - Corkscrew (SSH)
+- Mave
+- Gradle
+- Yarn
 - plus any other tool that respects the http_proxy, https_proxy env variables
 
 ## Installation
