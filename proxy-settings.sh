@@ -11,6 +11,9 @@ fi
 HTTP_PROXY='http://<proxy>:<port>'
 HTTPS_PROXY='http://<proxy>:<port>' # adjust protocol as needed (http/httpS)
 WGETRC="$HOME/.wgetrc"
+CONTAINERS_CONF="/etc/containers/containers.conf"
+CONTAINERS_CONF_USER="$HOME/.config/containers/containers.conf"
+
 
 # Check for dependencies
 command_exists() {
@@ -110,6 +113,37 @@ set_proxy() {
         echo "SSH or corkscrew is not available. Skipping SSH configuration."
     fi
 
+    # Check if Podman is installed
+if command_exists podman; then
+    # Check if containers.conf exists for the user first
+    if [[ -f "$CONTAINERS_CONF_USER" ]]; then
+        # Backup the original file first (only if a backup doesn't already exist)
+        [[ ! -f "$CONTAINERS_CONF_USER.bak" ]] && cp "$CONTAINERS_CONF_USER" "$CONTAINERS_CONF_USER.bak"
+
+        # Add proxy settings if they don't exist
+        if ! grep -q "^http_proxy=" "$CONTAINERS_CONF_USER"; then
+            echo "http_proxy=\"$http_proxy\"" >> "$CONTAINERS_CONF_USER"
+        fi
+        if ! grep -q "^https_proxy=" "$CONTAINERS_CONF_USER"; then
+            echo "https_proxy=\"$https_proxy\"" >> "$CONTAINERS_CONF_USER"
+        fi
+    elif [[ -f "$CONTAINERS_CONF" ]]; then  # Check the system-wide configuration if user-specific doesn't exist
+        # Same procedure: backup, then append if the proxies don't exist
+        sudo [[ ! -f "$CONTAINERS_CONF.bak" ]] && sudo cp "$CONTAINERS_CONF" "$CONTAINERS_CONF.bak"
+        if ! grep -q "^http_proxy=" "$CONTAINERS_CONF"; then
+            echo "http_proxy=\"$http_proxy\"" | sudo tee -a "$CONTAINERS_CONF"
+        fi
+        if ! grep -q "^https_proxy=" "$CONTAINERS_CONF"; then
+            echo "https_proxy=\"$https_proxy\"" | sudo tee -a "$CONTAINERS_CONF"
+        fi
+    else
+        echo "No containers.conf found. Skipping Podman configuration."
+    fi
+else
+    echo "Podman is not installed. Skipping Podman configuration."
+fi
+
+
 }
 
 # Function to unset proxy
@@ -173,6 +207,19 @@ unset_proxy() {
         sed -i '/Host \*/d' ~/.ssh/config
         sed -i "\|ProxyCommand corkscrew $HTTP_PROXY %h %p|d" ~/.ssh/config
     fi
+
+    if command_exists podman; then
+    # User-specific config
+    if [[ -f "$CONTAINERS_CONF_USER" ]]; then
+        sed -i '/^http_proxy=/d' "$CONTAINERS_CONF_USER"
+        sed -i '/^https_proxy=/d' "$CONTAINERS_CONF_USER"
+    # System-wide config
+    elif [[ -f "$CONTAINERS_CONF" ]]; then
+        sudo sed -i '/^http_proxy=/d' "$CONTAINERS_CONF"
+        sudo sed -i '/^https_proxy=/d' "$CONTAINERS_CONF"
+    fi
+fi
+
 }
 
 # Main script execution
