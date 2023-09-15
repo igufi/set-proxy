@@ -10,6 +10,14 @@ fi
 
 HTTP_PROXY='http://<proxy>:<port>'
 HTTPS_PROXY='http://<proxy>:<port>' # adjust protocol as needed (http/httpS)
+PROXY_PORT='<port>'
+# Assuming the HTTP_PROXY format is 'http://host:port'
+HTTP_PROXY_HOST="$(echo $HTTP_PROXY | cut -d'/' -f3 | cut -d':' -f1)"
+HTTP_PROXY_PORT="$(echo $HTTP_PROXY | cut -d':' -f3)"
+HTTPS_PROXY_HOST="$(echo $HTTPS_PROXY | cut -d'/' -f3 | cut -d':' -f1)"
+HTTPS_PROXY_PORT="$(echo $HTTPS_PROXY | cut -d':' -f3)"
+
+
 WGETRC="$HOME/.wgetrc"
 CONTAINERS_CONF="/etc/containers/containers.conf"
 CONTAINERS_CONF_USER="$HOME/.config/containers/containers.conf"
@@ -143,6 +151,45 @@ else
     echo "Podman is not installed. Skipping Podman configuration."
 fi
 
+# For Maven
+MAVEN_SETTINGS="$HOME/.m2/settings.xml"
+
+if command_exists mvn; then
+    if [[ ! -f "$MAVEN_SETTINGS" ]]; then
+        # Create settings.xml if it doesn't exist
+        mkdir -p "$HOME/.m2"
+        echo "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd\"></settings>" > "$MAVEN_SETTINGS"
+    fi
+
+    # Add proxy settings if they don't exist
+    if ! grep -q "<proxies>" "$MAVEN_SETTINGS"; then
+        sed -i "s|</settings>|<proxies>\n<proxy>\n<id>example-proxy</id>\n<active>true</active>\n<protocol>http</protocol>\n<host>$HTTP_PROXY_HOST</host>\n<port>$PROXY_PORT</port>\n</proxy>\n</proxies>\n</settings>|" "$MAVEN_SETTINGS"
+    fi
+else
+    echo "Maven is not installed. Skipping Maven configuration."
+fi
+
+# For Gradle
+GRADLE_PROPERTIES="$HOME/.gradle/gradle.properties"
+
+if command_exists gradle; then
+    echo "systemProp.http.proxyHost=$HTTP_PROXY_HOST" >> "$GRADLE_PROPERTIES"
+    echo "systemProp.http.proxyPort=$PROXY_PORT" >> "$GRADLE_PROPERTIES"
+    echo "systemProp.https.proxyHost=$HTTPS_PROXY_HOST" >> "$GRADLE_PROPERTIES"
+    echo "systemProp.https.proxyPort=$PROXY_PORT" >> "$GRADLE_PROPERTIES"
+else
+    echo "Gradle is not installed. Skipping Gradle configuration."
+fi
+
+# For Yarn
+if command_exists yarn; then
+    yarn config set proxy "$HTTP_PROXY"
+    yarn config set https-proxy "$HTTPS_PROXY"
+else
+    echo "Yarn is not installed. Skipping Yarn configuration."
+fi
+
+
 
 }
 
@@ -219,6 +266,26 @@ unset_proxy() {
         sudo sed -i '/^https_proxy=/d' "$CONTAINERS_CONF"
     fi
 fi
+
+# For Maven
+if command_exists mvn && [[ -f "$MAVEN_SETTINGS" ]]; then
+    sed -i "/<proxies>/,/<\/proxies>/d" "$MAVEN_SETTINGS"
+fi
+
+# For Gradle
+if command_exists gradle && [[ -f "$GRADLE_PROPERTIES" ]]; then
+    sed -i "/systemProp.http.proxyHost=$HTTP_PROXY/d" "$GRADLE_PROPERTIES"
+    sed -i "/systemProp.http.proxyPort=$PROXY_PORT/d" "$GRADLE_PROPERTIES"
+    sed -i "/systemProp.https.proxyHost=$HTTP_PROXY/d" "$GRADLE_PROPERTIES"
+    sed -i "/systemProp.https.proxyPort=$PROXY_PORT/d" "$GRADLE_PROPERTIES"
+fi
+
+# For Yarn
+if command_exists yarn; then
+    yarn config delete proxy
+    yarn config delete https-proxy
+fi
+
 
 }
 
