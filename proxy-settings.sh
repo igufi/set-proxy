@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # Stop the script on the first error
+#set -e  # Stop the script on the first error
 
 # Validate input
 if [[ ! "$1" =~ ^(on|off)$ ]]; then
@@ -33,11 +33,13 @@ set_proxy() {
     # Environment Variables
     export http_proxy="$HTTP_PROXY"
     export https_proxy="$HTTPS_PROXY"
+    echo "Proxy enabled: env"
 
     # For git
     if command_exists git; then
         git config --global http.proxy "$http_proxy"
         git config --global https.proxy "$https_proxy"
+        echo "Proxy enabled: git"
     else
         echo "git is not installed. Skipping git configuration."
     fi
@@ -46,13 +48,15 @@ set_proxy() {
     if [[ ! -e /etc/apt/apt.conf.d/30proxy.bak ]]; then
         sudo cp /etc/apt/apt.conf.d/30proxy /etc/apt/apt.conf.d/30proxy.bak 2>/dev/null || true
     fi
-    echo "Acquire::http::Proxy \"$http_proxy\";" | sudo tee /etc/apt/apt.conf.d/30proxy
-    echo "Acquire::https::Proxy \"$https_proxy\";" | sudo tee -a /etc/apt/apt.conf.d/30proxy
+    echo "Acquire::http::Proxy \"$http_proxy\";" | sudo tee /etc/apt/apt.conf.d/30proxy >/dev/null
+    echo "Acquire::https::Proxy \"$https_proxy\";" | sudo tee -a /etc/apt/apt.conf.d/30proxy >/dev/null
+    echo "Proxy enabled: apt"
 
     # For npm
     if command_exists npm; then
         /usr/bin/npm config set proxy "$http_proxy"
         /usr/bin/npm config set https-proxy "$https_proxy"
+        echo "Proxy enabled: npm"
     else
         echo "npm is not installed. Skipping npm configuration."
     fi
@@ -61,13 +65,15 @@ set_proxy() {
     if command_exists wget; then
         echo "http_proxy=$http_proxy" > "$WGETRC"
         echo "https_proxy=$https_proxy" >> "$WGETRC"
+        echo "Proxy enabled: wget"
     else
         echo "wget is not installed. Skipping wget configuration."
     fi
 
     # For pip
     if command_exists pip; then
-        pip config set global.proxy "$http_proxy"
+        pip config set global.proxy "$http_proxy" >/dev/null
+        echo "Proxy enabled: pip"
     else
         echo "pip is not installed. Skipping pip configuration."
     fi
@@ -81,6 +87,7 @@ set_proxy() {
         echo "Environment=\"HTTP_PROXY=$http_proxy\" \"HTTPS_PROXY=$https_proxy\"" | sudo tee -a /etc/systemd/system/docker.service.d/http-proxy.conf
         sudo systemctl daemon-reload
         sudo systemctl restart docker
+        echo "Proxy enabled: docker"
     else
         echo "Docker is not installed. Skipping Docker configuration."
     fi
@@ -89,6 +96,7 @@ set_proxy() {
     if command_exists gpg; then
         echo "use-http-proxy" >> ~/.gnupg/gpg.conf
         echo "http-proxy $http_proxy" >> ~/.gnupg/gpg.conf
+        echo "Proxy enabled: gpg"
     else
         echo "GnuPG is not installed. Skipping GnuPG configuration."
     fi
@@ -108,6 +116,7 @@ set_proxy() {
             echo -e "[http]\nproxy = \"$http_proxy\"" >> "$CARGO_CONFIG"
         fi
       fi
+      echo "Proxy enabled: cargo/rust"
    else
      echo "Rust Cargo directory not found. Skipping Rust configuration."
    fi
@@ -117,6 +126,7 @@ set_proxy() {
     if command_exists ssh && command_exists corkscrew; then
         echo "Host *" >> ~/.ssh/config
         echo "    ProxyCommand corkscrew $HTTP_PROXY %h %p" >> ~/.ssh/config
+        echo "Proxy enabled: corkscrew/ssh"
     else
         echo "SSH or corkscrew is not available. Skipping SSH configuration."
     fi
@@ -144,6 +154,7 @@ if command_exists podman; then
         if ! grep -q "^https_proxy=" "$CONTAINERS_CONF"; then
             echo "https_proxy=\"$https_proxy\"" | sudo tee -a "$CONTAINERS_CONF"
         fi
+    echo "Proxy enabled: podman"
     else
         echo "No containers.conf found. Skipping Podman configuration."
     fi
@@ -165,6 +176,7 @@ if command_exists mvn; then
     if ! grep -q "<proxies>" "$MAVEN_SETTINGS"; then
         sed -i "s|</settings>|<proxies>\n<proxy>\n<id>example-proxy</id>\n<active>true</active>\n<protocol>http</protocol>\n<host>$HTTP_PROXY_HOST</host>\n<port>$PROXY_PORT</port>\n</proxy>\n</proxies>\n</settings>|" "$MAVEN_SETTINGS"
     fi
+    echo "Proxy enabled: maven"
 else
     echo "Maven is not installed. Skipping Maven configuration."
 fi
@@ -177,6 +189,7 @@ if command_exists gradle; then
     echo "systemProp.http.proxyPort=$PROXY_PORT" >> "$GRADLE_PROPERTIES"
     echo "systemProp.https.proxyHost=$HTTPS_PROXY_HOST" >> "$GRADLE_PROPERTIES"
     echo "systemProp.https.proxyPort=$PROXY_PORT" >> "$GRADLE_PROPERTIES"
+    echo "Proxy enabled: gradle"
 else
     echo "Gradle is not installed. Skipping Gradle configuration."
 fi
@@ -185,6 +198,7 @@ fi
 if command_exists yarn; then
     yarn config set proxy "$HTTP_PROXY"
     yarn config set https-proxy "$HTTPS_PROXY"
+    echo "Proxy enabled: yarnn"
 else
     echo "Yarn is not installed. Skipping Yarn configuration."
 fi
